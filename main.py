@@ -51,4 +51,4 @@ def parse_pdf(data: FileInput):
         }
 
     except Exception as e:
-        return {"error": str(e)}
+        return {"error": str(e)} 
