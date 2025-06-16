@@ -52,8 +52,8 @@ def parse_pdf(data: FileInput):
             # Resume Parsing
 
             # ✅ Improved email and phone matching
-            emails = re.findall(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}", text)
-            email = emails[0] if emails else "Not found"
+            email_match = re.search(r"Email\s*[:\-]?\s*([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})", text, re.IGNORECASE)
+email = email_match.group(1).strip() if email_match else "Not found"
 
             phone = re.search(r"(?:\+91[\-\s]?)?[6-9]\d{9}", text)
 
