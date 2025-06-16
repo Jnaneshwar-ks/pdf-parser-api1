@@ -2,8 +2,8 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 import base64
 from io import BytesIO
-import PyPDF2
 import re
+import pdfplumber  # ✅ Replaces PyPDF2
 
 app = FastAPI()
 
@@ -17,8 +17,13 @@ def parse_pdf(data: FileInput):
     try:
         # Decode base64 string to bytes
         content = base64.b64decode(data.fileContent)
-        reader = PyPDF2.PdfReader(BytesIO(content))
-        text = " ".join([page.extract_text() for page in reader.pages if page.extract_text()])
+
+        # ✅ Use pdfplumber for better text extraction
+        with pdfplumber.open(BytesIO(content)) as pdf:
+            text = " ".join([page.extract_text() for page in pdf.pages if page.extract_text()])
+
+        print("------- Extracted Text Preview --------")
+        print(text[:1000])  # limit for safety/log size
 
         if data.fileType.lower() == "offer_letter":
             # Offer Letter Parsing
@@ -45,17 +50,23 @@ def parse_pdf(data: FileInput):
 
         elif data.fileType.lower() == "resume":
             # Resume Parsing
-            email = re.search(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b", text)
-            phone = re.search(r"\b(?:\+91[\-\s]?)?[6-9]\d{9}\b", text)
-            skills_match = re.search(r"Skills\s*[:\-]?\s*(.+?)(?:\n|Experience|Projects)", text, re.IGNORECASE)
-            experience = re.search(r"Experience\s*[:\-]?\s*(.+?)(?:\n|Skills|Projects)", text, re.IGNORECASE)
+
+            # ✅ Improved email and phone matching
+            emails = re.findall(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}", text)
+            email = emails[0] if emails else "Not found"
+
+            phone = re.search(r"(?:\+91[\-\s]?)?[6-9]\d{9}", text)
+
+            # ✅ More flexible skill and experience matching
+            skills_match = re.search(r"(Skills|Technical Skills)[\s:\-]*([\w\s,]+)", text, re.IGNORECASE)
+            experience = re.search(r"(Experience|Work Experience)[\s:\-]*([\w\s.,]+)", text, re.IGNORECASE)
 
             return {
                 "document_type": "Resume",
-                "email": email.group(0) if email else "Not found",
+                "email": email,
                 "phone": phone.group(0) if phone else "Not found",
-                "skills": skills_match.group(1).strip() if skills_match else "Not found",
-                "experience": experience.group(1).strip() if experience else "Not found",
+                "skills": skills_match.group(2).strip() if skills_match else "Not found",
+                "experience": experience.group(2).strip() if experience else "Not found",
                 "raw_text_excerpt": text[:500]
             }
 
